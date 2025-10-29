@@ -1,0 +1,4 @@
+websockets>=11.0.3
+aiohttp>=3.8.5
+psutil>=5.9.5
+click>=8.1.7
