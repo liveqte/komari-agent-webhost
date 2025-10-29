@@ -348,6 +348,7 @@ class SystemInfoCollector:
                 r'^/dev/xvd[a-z]+$',
                 r'^/dev/nvme[0-9]+n[0-9]+$',
                 r'^/dev/mmcblk[0-9]+$',
+		 r'^zroot/.*$',
             ]
             is_physical_device = any(re.match(pattern, device) for pattern in physical_patterns)
             return is_physical_device
@@ -1136,8 +1137,8 @@ def parse_args() -> Dict[str, Any]:
     args = {
         'http_server': '',
         'token': '',
-        'interval': 5.0,
-        'reconnect_interval': 10,
+        'interval': 1.0,
+        'reconnect_interval': 5,
         'ignore_unsafe_cert': True,
         'log_level': 0,
         'disable_remote_control': False
