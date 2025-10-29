@@ -348,7 +348,7 @@ class SystemInfoCollector:
                 r'^/dev/xvd[a-z]+$',
                 r'^/dev/nvme[0-9]+n[0-9]+$',
                 r'^/dev/mmcblk[0-9]+$',
-		 r'^zroot/.*$',
+                r'^zroot/.*$',
             ]
             is_physical_device = any(re.match(pattern, device) for pattern in physical_patterns)
             return is_physical_device
