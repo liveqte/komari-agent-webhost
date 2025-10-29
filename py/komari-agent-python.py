@@ -1136,8 +1136,8 @@ def parse_args() -> Dict[str, Any]:
     args = {
         'http_server': '',
         'token': '',
-        'interval': 1.0,
-        'reconnect_interval': 5,
+        'interval': 5.0,
+        'reconnect_interval': 10,
         'ignore_unsafe_cert': True,
         'log_level': 0,
         'disable_remote_control': False
