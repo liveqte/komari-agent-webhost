@@ -6,7 +6,6 @@
 # 在平等、互相尊重基础上的使用本项目。
 #
 
-
 import asyncio
 import json
 import os
@@ -1174,12 +1173,21 @@ def parse_env_args() -> Dict[str, Any]:
     return {
         'http_server': os.getenv('KOMARI_HTTP_SERVER', ''),
         'token': os.getenv('KOMARI_TOKEN', ''),
-        'interval': float(os.getenv('KOMARI_INTERVAL', '1.0')),
-        'reconnect_interval': int(os.getenv('KOMARI_RECONNECT_INTERVAL', '5')),
+        'interval': float(os.getenv('KOMARI_INTERVAL', '5.0')),
+        'reconnect_interval': int(os.getenv('KOMARI_RECONNECT_INTERVAL', '10')),
         'ignore_unsafe_cert': os.getenv('KOMARI_IGNORE_UNSAFE_CERT', 'true').lower() != 'false',
         'log_level': int(os.getenv('KOMARI_LOG_LEVEL', '0')),
         'disable_remote_control': os.getenv('KOMARI_DISABLE_REMOTE_CONTROL', 'false').lower() == 'true'
     }
+
+def merge_config(cli_config: dict, env_config: dict) -> dict:
+    # 只保留非空命令行参数
+    filtered_cli = {
+        k: v for k, v in cli_config.items()
+        if v not in [None, '', []]
+    }
+    # 环境变量作为基础，命令行参数覆盖非空项
+    return {**env_config, **filtered_cli}
 
 def get_final_config() -> Dict[str, Any]:
     """获取最终配置"""
@@ -1187,8 +1195,8 @@ def get_final_config() -> Dict[str, Any]:
     need_env = not cli_config['http_server'] or not cli_config['token']
     env_config = parse_env_args() if need_env else {}
     
-    config = {**env_config, **cli_config}
-    
+    config = merge_config(cli_config, env_config)
+    print(cli_config)
     if not config['http_server']:
         print("错误: 必须提供 --http-server 参数或设置 KOMARI_HTTP_SERVER 环境变量")
         _show_help()
