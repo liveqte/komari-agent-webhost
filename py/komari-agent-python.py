@@ -22,6 +22,8 @@ from typing import Dict, List, Optional, Any, Tuple
 from urllib.parse import urlparse
 import pty
 import select
+import shutil
+
 
 class Logger:
     """日志处理器"""
@@ -128,7 +130,11 @@ class SystemInfoCollector:
         network_stats = await self._get_network_stats()
         memory_info = await self._get_memory_info()
         disk_info = await self._get_disk_info()
-        
+        try: 
+            process_count = len(psutil.pids()) 
+        except Exception as e: 
+            process_count = 0
+            Logger.debug(f"获取进程数失败：{e}", 1)
         info = {
             "cpu": {
                 "usage": cpu_usage
@@ -161,7 +167,7 @@ class SystemInfoCollector:
                 "udp": await self._get_udp_connections()
             },
             "uptime": int(time.time() - psutil.boot_time()),
-            "process": len(psutil.pids()),
+            "process": process_count,
             "message": ""
         }
         
@@ -1259,12 +1265,11 @@ async def check_environment() -> bool:
     if platform.system() != "Windows":
         required_commands = ['ping']
         for cmd in required_commands:
-            try:
-                subprocess.run(['which', cmd], capture_output=True, check=True)
+            if shutil.which(cmd) is not None:
                 print(f"✅ 系统命令 {cmd} 可用")
-            except subprocess.CalledProcessError:
+            else:
                 warnings.append(f"缺少系统命令: {cmd}，部分功能可能受限")
-    
+
     # 检查 PTY 支持
     if platform.system() != "Windows":
         try:
