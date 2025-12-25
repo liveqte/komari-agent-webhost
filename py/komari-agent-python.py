@@ -23,8 +23,31 @@ from urllib.parse import urlparse
 import pty
 import select
 import shutil
+from websockets.exceptions import ConnectionClosed
+import fcntl
+import termios
+import struct
 
-
+def setup_child_terminal(slave_fd):
+    """在子进程中执行：设置控制终端"""
+    # 1. 创建新的会话
+    os.setsid()
+    
+    # 2. 设置 slave_fd 为控制终端
+    # 在某些 Unix 系统上，通过 ioctl 设置 TIOCSCTTY
+    import fcntl
+    if hasattr(termios, 'TIOCSCTTY'):
+        fcntl.ioctl(slave_fd, termios.TIOCSCTTY, 0)
+    
+    # 3. 将 slave_fd 复制到标准输入、输出、错误
+    os.dup2(slave_fd, 0)
+    os.dup2(slave_fd, 1)
+    os.dup2(slave_fd, 2)
+    
+    # 4. 子进程不再需要原始的 slave_fd 拷贝
+    if slave_fd > 2:
+        os.close(slave_fd)
+        
 class Logger:
     """日志处理器"""
     _log_level = 0  # 0=关闭Debug日志, 1=基本信息, 2=WebSocket传输，3=终端日志，4网络统计日志，5磁盘统计日志
@@ -591,7 +614,41 @@ class TerminalSessionHandler:
         self.heartbeat_timeout = None
         self.last_heartbeat = 0
         self.HEARTBEAT_TIMEOUT = 30  # 30秒
-    
+        self.process = None
+        self.master_fd = None
+        self.slave_fd = None
+    async def cleanup(self):
+        """彻底清理终端资源"""
+        Logger.info("执行终端资源清理...")
+        
+        # 1. 杀死子进程
+        if self.process:
+            try:
+                # 尝试杀掉整个进程组 (os.setsid 配合 os.killpg)
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                else:
+                    self.process.terminate()
+                
+                # 异步等待进程结束
+                try:
+                    await asyncio.wait_for(self.process.wait(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    self.process.kill()
+            except Exception as e:
+                Logger.debug(f"清理进程失败: {e}")
+            self.process = None
+
+        # 2. 关闭 PTY 文件描述符
+        for fd_name in ['master_fd', 'slave_fd']:
+            fd = getattr(self, fd_name)
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except Exception as e:
+                    Logger.debug(f"关闭 {fd_name} 失败: {e}")
+                setattr(self, fd_name, None)
+
     async def start_session(self, request_id: str, server: str, token: str):
         """启动终端会话"""
         log = lambda msg: Logger.info(f"[终端会话 {request_id}] {msg}")
@@ -605,59 +662,86 @@ class TerminalSessionHandler:
             async with websockets.connect(terminal_url) as websocket:
                 log("终端 WebSocket 连接成功")
                 await self._run_terminal(websocket, request_id, log)
-                
+        except ConnectionClosed:
+            log(f"[终端会话] 客户端连接已断开 (未收到关闭帧)")
         except Exception as e:
             log(f"终端会话异常: {e}")
-        
-        log("终端会话结束")
+        finally:
+            await self.cleanup() 
+            log(f"[终端会话] 资源清理完毕: {request_id}")
     
     async def _run_terminal(self, websocket, request_id: str, log):
-        """运行终端"""
+        """运行终端 - 稳健版"""
+        self.master_fd = None
+        self.slave_fd = None
+        
         try:
-            # 创建主从 PTY
-            master, slave = pty.openpty()
+            # 1. 创建 PTY
+            self.master_fd, self.slave_fd = pty.openpty()
             
-            # 启动 shell 进程
+            # 2. 启动子进程：直接把 slave_fd 传给 std 接口
+            # 这种方式最稳定，不容易导致连接中断
             shell = os.environ.get('SHELL', '/bin/bash')
-            if platform.system() == "Windows":
-                shell = "cmd.exe"
             
-            process = await asyncio.create_subprocess_shell(
+            self.process = await asyncio.create_subprocess_exec(
                 shell,
-                stdin=slave,
-                stdout=slave,
-                stderr=slave,
+                # 关键：让子进程的 std 直接指向 PTY 的从端
+                stdin=self.slave_fd,
+                stdout=self.slave_fd,
+                stderr=self.slave_fd,
+                # 保持基本的进程组分离即可
                 preexec_fn=os.setsid if hasattr(os, 'setsid') else None
             )
             
-            log(f"启动终端进程: {shell}")
-            
-            # 创建任务处理双向数据流
+            log(f"终端进程已启动 (PID: {self.process.pid})")
+
+            # 3. 必须在子进程启动后关闭主进程中的 slave_fd 引用
+            # 否则 master_fd 永远不会收到 EOF
+            if self.slave_fd is not None:
+                os.close(self.slave_fd)
+                self.slave_fd = None
+
+            # 4. 设置 master_fd 为非阻塞模式，防止 select/read 造成微小卡顿
+            fl = fcntl.fcntl(self.master_fd, fcntl.F_GETFL)
+            fcntl.fcntl(self.master_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+            # 5. 启动任务
             tasks = [
-                self._handle_pty_output(websocket, master, log),
-                self._handle_websocket_input(websocket, master, log),
-                self._monitor_process(websocket, process, log)
+                asyncio.create_task(self._handle_pty_output(websocket, self.master_fd, log)),
+                asyncio.create_task(self._handle_websocket_input(websocket, self.master_fd, log)),
+                asyncio.create_task(self._monitor_process(websocket, self.process, log))
             ]
             
-            await asyncio.gather(*tasks, return_exceptions=True)
+            # 等待任意一个结束
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             
+            for t in pending:
+                t.cancel()
+                
         except Exception as e:
-            log(f"终端运行异常: {e}")
+            log(f"启动终端失败: {str(e)}")
+            # 即使启动失败也要确保清理
+            await self.cleanup()
     
     async def _handle_pty_output(self, websocket, master, log):
         """处理 PTY 输出到 WebSocket"""
         try:
             while True:
-                # 使用 select 检查是否有数据可读
+                # 检查 master 是否有效
+                if master is None: break
+                
                 rlist, _, _ = select.select([master], [], [], 0.1)
                 if master in rlist:
-                    try:
-                        data = os.read(master, 1024)
-                        if data:
-                            await websocket.send(data)
-                    except (OSError, BlockingIOError):
+                    # 读取数据
+                    data = os.read(master, 4096) # 调大缓冲区
+                    if not data: # EOF
                         break
-                await asyncio.sleep(0.01)
+                    await websocket.send(data)
+                else:
+                    # 让出控制权，防止 CPU 100%
+                    await asyncio.sleep(0.01)
+        except (OSError, ConnectionClosed):
+            pass # 正常退出
         except Exception as e:
             log(f"处理PTY输出异常: {e}")
     
@@ -975,7 +1059,7 @@ class EventHandler:
             return
         
         Logger.info(f"建立终端连接: {request_id}")
-        await self._start_terminal_session(request_id)
+        asyncio.create_task(self._start_terminal_session(request_id))
     
     async def _start_terminal_session(self, request_id: str):
         """启动终端会话"""
