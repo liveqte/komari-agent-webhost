@@ -266,33 +266,22 @@ class SystemInfoCollector:
         if not dev_name:
             return None
 
-        sd_match = re.match(r'^(sd[a-z]+)\d*$', dev_name)
-        if sd_match:
-            physical_name = sd_match.group(1)
-            return f"/dev/{physical_name}"
+        DEVICE_PATTERNS = [
+            r'^(md[0-9]+)$',
+            r'^(sd[a-z]+)\d*$',
+            r'^(vd[a-z]+)\d*$',
+            r'^(xvd[a-z]+)\d*$',
+            r'^(mmcblk\d+)p?\d*$',
+            r'^(nvme\d+n\d+)p?\d*$',
+        ]
 
-        vd_match = re.match(r'^(vd[a-z]+)\d*$', dev_name)
-        if vd_match:
-            physical_name = vd_match.group(1)
-            return f"/dev/{physical_name}"
-
-        xvd_match = re.match(r'^(xvd[a-z]+)\d*$', dev_name)
-        if xvd_match:
-            physical_name = xvd_match.group(1)
-            return f"/dev/{physical_name}"
-
-        mmcblk_match = re.match(r'^(mmcblk\d+)p?\d*$', dev_name)
-        if mmcblk_match:
-            physical_name = mmcblk_match.group(1)
-            return f"/dev/{physical_name}"
-
-        nvme_match = re.match(r'^(nvme\d+n\d+)p?\d*$', dev_name)
-        if nvme_match:
-            physical_name = nvme_match.group(1)
-            return f"/dev/{physical_name}"
+        for pattern in DEVICE_PATTERNS:
+            m = re.match(pattern, dev_name)
+            if m:
+                return f"/dev/{m.group(1)}"
 
         if not re.search(r'\d', dev_name):
-             return device_path
+            return device_path
 
         sys_block_path = f"/sys/block/{dev_name}"
         if os.path.exists(sys_block_path):
@@ -1226,13 +1215,13 @@ class KomariMonitorClient:
 def parse_args() -> Dict[str, Any]:
     """解析命令行参数"""
     args = {
-        'http_server': '',
-        'token': '',
-        'interval': 1.0,
-        'reconnect_interval': 5,
-        'ignore_unsafe_cert': True,
-        'log_level': 0,
-        'disable_remote_control': False
+        'http_server': None,
+        'token': None,
+        'interval': None,
+        'reconnect_interval': None,
+        'ignore_unsafe_cert': None,
+        'log_level': None,
+        'disable_remote_control': None
     }
     
     argv = sys.argv[1:]
@@ -1273,19 +1262,19 @@ def parse_env_args() -> Dict[str, Any]:
     }
 
 def merge_config(cli_config: dict, env_config: dict) -> dict:
-    # 只保留非空命令行参数
-    filtered_cli = {
-        k: v for k, v in cli_config.items()
-        if v not in [None, '', []]
-    }
-    # 环境变量作为基础，命令行参数覆盖非空项
-    return {**env_config, **filtered_cli}
+    merged = env_config.copy()
+    # print(f"cli_config{cli_config}")
+    # print(f"env_config{env_config}")
+    for key, value in cli_config.items():
+        if value is not None:  # 只覆盖非 None
+            merged[key] = value
+    return merged
+
 
 def get_final_config() -> Dict[str, Any]:
     """获取最终配置"""
     cli_config = parse_args()
-    need_env = not cli_config['http_server'] or not cli_config['token']
-    env_config = parse_env_args() if need_env else {}
+    env_config = parse_env_args()
     
     config = merge_config(cli_config, env_config)
     print(cli_config)
