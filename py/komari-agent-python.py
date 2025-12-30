@@ -1277,7 +1277,7 @@ def get_final_config() -> Dict[str, Any]:
     env_config = parse_env_args()
     
     config = merge_config(cli_config, env_config)
-    print(cli_config)
+    # print(cli_config)
     if not config['http_server']:
         print("错误: 必须提供 --http-server 参数或设置 KOMARI_HTTP_SERVER 环境变量")
         _show_help()
