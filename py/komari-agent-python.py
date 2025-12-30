@@ -258,8 +258,7 @@ class SystemInfoCollector:
     def _get_physical_disk_device(self, device_path: str) -> Optional[str]:
         if platform.system() != "Linux":
             return device_path
-
-        import os
+            
         import re
 
         dev_name = device_path.replace("/dev/", "")
