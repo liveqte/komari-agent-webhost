@@ -377,6 +377,7 @@ class SystemInfoCollector:
                 r'^/dev/xvd[a-z]+$',
                 r'^/dev/nvme[0-9]+n[0-9]+$',
                 r'^/dev/mmcblk[0-9]+$',
+                r'^/dev/md[0-9]+$', 
                 r'^zroot/.*$',
             ]
             is_physical_device = any(re.match(pattern, device) for pattern in physical_patterns)
@@ -1293,6 +1294,11 @@ def get_final_config() -> Dict[str, Any]:
         _show_help()
         sys.exit(1)
     
+    # 避免url最后带/导至后面产生错误
+    http_server = config.get('http_server', '')
+    if isinstance(http_server, str):
+        config['http_server'] = http_server.rstrip('/')
+
     if not config['token']:
         print("错误: 必须提供 --token 参数或设置 KOMARI_TOKEN 环境变量")
         _show_help()
