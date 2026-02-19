@@ -1302,9 +1302,9 @@ def get_final_config() -> Dict[str, Any]:
 
 def _show_help():
     """显示帮助信息"""
-    print("komari-agent-python 1.0.0")
+    print("komari-agent-python 1.1.0")
     print()
-    print("用法: python komari_agent.py --token <token> [选项]")
+    print("用法: python agent.py --token <token> [选项]")
     print()
     print("选项:")
     print("  --http-server <url>        服务器地址 (也可通过 KOMARI_HTTP_SERVER 环境变量设置) (必须)")
