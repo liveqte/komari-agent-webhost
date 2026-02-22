@@ -4,7 +4,6 @@
 # komari-agent-python-1.1.0-wasm by liming2038
 # 基础原则：不是有贡献就可以对普通用户指指点点，普通用户使用开源项目也有平等发声权力，不能打着维护原作者的旗号来贬低他人，远离饭圈文化。
 # 在平等、互相尊重基础上的使用本项目。
-#
 
 import asyncio
 import json
@@ -130,6 +129,14 @@ class AgentStatus:
         self.websocket_connected = False
         self.http_server_runner = None  # 存储 aiohttp AppRunner（改名避免混淆）
         self.config = config or {}  # ✅ 修复：初始化 config
+        self._script_start_time = time.time()
+        
+    def _calculate_uptime(self) -> int:
+        """计算运行时间 - 与 SystemInfoCollector._get_uptime() 逻辑一致"""
+        # WASM 环境或 psutil 不可用：使用脚本启动时间
+        if hasattr(self, '_script_start_time') and self._script_start_time:
+            return int(time.time() - self._script_start_time)
+        return 0
         
     def set_config(self, config: Dict[str, Any]):
         """设置配置（如果在创建时未传入）"""
@@ -165,9 +172,7 @@ class AgentStatus:
         
     def to_dict(self) -> Dict[str, Any]:
         """导出状态为字典"""
-        uptime = None
-        if self.start_time:
-            uptime = (datetime.now(timezone.utc) - self.start_time).total_seconds()
+        uptime_seconds = self._calculate_uptime()
         
         # ✅ 修复：安全访问 config
         http_server_url = self.config.get('http_server') if self.config else None
@@ -178,7 +183,7 @@ class AgentStatus:
                 "runtime": "wasm" if IS_WASM else "native",
                 "is_running": self.is_running,
                 "start_time": self.start_time.isoformat() if self.start_time else None,
-                "uptime_seconds": round(uptime, 2) if uptime else None,
+                "uptime_seconds": uptime_seconds,
                 "last_heartbeat": self.last_heartbeat,
             },
             "connection": {
