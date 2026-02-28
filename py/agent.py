@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 #
 # komari-agent-python by liming2038
 # 基础原则：不是有贡献就可以对普通用户指指点点，普通用户使用开源项目也有平等发声权力，不能打着维护原作者的旗号来贬低他人，远离饭圈文化。
@@ -27,6 +26,18 @@ from websockets.exceptions import ConnectionClosed
 import fcntl
 import termios
 import struct
+
+def parse_env_args() -> Dict[str, Any]:
+    """解析环境变量"""
+    return {
+        'http_server': os.getenv('KOMARI_HTTP_SERVER', ''),
+        'token': os.getenv('KOMARI_TOKEN', ''),
+        'interval': float(os.getenv('KOMARI_INTERVAL', '5.0')),
+        'reconnect_interval': int(os.getenv('KOMARI_RECONNECT_INTERVAL', '10')),
+        'ignore_unsafe_cert': os.getenv('KOMARI_IGNORE_UNSAFE_CERT', 'true').lower() != 'false',
+        'log_level': int(os.getenv('KOMARI_LOG_LEVEL', '0')),
+        'disable_remote_control': os.getenv('KOMARI_DISABLE_REMOTE_CONTROL', 'false').lower() == 'true'
+    }
 
 def setup_child_terminal(slave_fd):
     """在子进程中执行：设置控制终端"""
@@ -94,7 +105,7 @@ class Logger:
 class SystemInfoCollector:
     """系统信息收集器"""
     
-    VERSION = "komari-agent-python-1.0.0"
+    VERSION = "komari-agent-python-1.1.1"
     
     def __init__(self):
         self.last_network_stats = {'rx': 0, 'tx': 0}
@@ -671,6 +682,10 @@ class TerminalSessionHandler:
         self.slave_fd = None
         
         try:
+            # 针对vs code 环境的终端错误处理
+            env = os.environ.copy()
+            env.pop('PROMPT_COMMAND', None)
+
             # 1. 创建 PTY
             self.master_fd, self.slave_fd = pty.openpty()
             
@@ -684,6 +699,7 @@ class TerminalSessionHandler:
                 stdin=self.slave_fd,
                 stdout=self.slave_fd,
                 stderr=self.slave_fd,
+                env=env,
                 # 保持基本的进程组分离即可
                 preexec_fn=os.setsid if hasattr(os, 'setsid') else None
             )
@@ -1254,17 +1270,6 @@ def parse_args() -> Dict[str, Any]:
     
     return args
 
-def parse_env_args() -> Dict[str, Any]:
-    """解析环境变量"""
-    return {
-        'http_server': os.getenv('KOMARI_HTTP_SERVER', ''),
-        'token': os.getenv('KOMARI_TOKEN', ''),
-        'interval': float(os.getenv('KOMARI_INTERVAL', '5.0')),
-        'reconnect_interval': int(os.getenv('KOMARI_RECONNECT_INTERVAL', '10')),
-        'ignore_unsafe_cert': os.getenv('KOMARI_IGNORE_UNSAFE_CERT', 'true').lower() != 'false',
-        'log_level': int(os.getenv('KOMARI_LOG_LEVEL', '0')),
-        'disable_remote_control': os.getenv('KOMARI_DISABLE_REMOTE_CONTROL', 'false').lower() == 'true'
-    }
 
 def merge_config(cli_config: dict, env_config: dict) -> dict:
     merged = env_config.copy()
@@ -1302,7 +1307,7 @@ def get_final_config() -> Dict[str, Any]:
 
 def _show_help():
     """显示帮助信息"""
-    print("komari-agent-python 1.1.0")
+    print(SystemInfoCollector.VERSION)
     print()
     print("用法: python agent.py --token <token> [选项]")
     print()
