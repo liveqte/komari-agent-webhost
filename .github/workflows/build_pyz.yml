@@ -14,6 +14,10 @@ on:
       - master
   workflow_dispatch: 
 
+permissions:
+  contents: write  # 允许创建/更新 Release
+  actions: read    # 允许读取工作流信息（可选）
+  
 # 防止并发构建冲突
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -42,7 +46,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install shiv build setuptools wheel
 
-      # 4️⃣ 验证 Python 版本（调试用）
+      # 4️⃣ 验证 Python 版本
       - name: Verify Python version
         run: |
           python --version
@@ -84,26 +88,15 @@ jobs:
           fi
 
       # 8️⃣ 上传构建产物
-      - name: Upload pyagent.pyz artifact
-        uses: actions/upload-artifact@v4
+      - name: Release to GitHub
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
         with:
-          name: pyagent-py38-${{ github.sha }}
-          path: pyagent.pyz
-          retention-days: 30
-          if-no-files-found: error
-
-      # 9️⃣ 上传构建日志（可选，便于调试）
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs-${{ github.sha }}
-          path: |
-            build/
-            dist/
-            *.egg-info/
-          retention-days: 7
-          if-no-files-found: ignore
+          files: pyagent.pyz
+          tag_name: latest
+          name: Latest Build
+          overwrite: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   # 🔁 可选：多版本构建矩阵（如果需要同时支持 3.8/3.11）
   # build-matrix:
