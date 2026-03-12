@@ -1400,5 +1400,9 @@ async def main():
         Logger.error(f"程序异常: {e}")
         sys.exit(1)
 
-if __name__ == "__main__":
+def entry_point():
+    """✅ 同步入口函数 - console_scripts 实际调用的函数"""
     asyncio.run(main())
+
+if __name__ == "__main__":
+    entry_point()

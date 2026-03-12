@@ -1,0 +1,124 @@
+# .github/workflows/build_pyz.yml
+name: Build PyAgent
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch: 
+
+# 防止并发构建冲突
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build pyagent.pyz (Python 3.8)
+    runs-on: ubuntu-22.04  # 使用较新 Ubuntu 确保 glibc 兼容性
+
+    steps:
+      # 1️⃣ 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ 设置 Python 3.8 环境
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+          cache: 'pip'  # 启用 pip 缓存加速
+
+      # 3️⃣ 安装构建工具
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install shiv build setuptools wheel
+
+      # 4️⃣ 验证 Python 版本（调试用）
+      - name: Verify Python version
+        run: |
+          python --version
+          which python
+          pip --version
+
+      # 5️⃣ 安装项目依赖（确保 wheel 是 3.8 兼容的）
+      - name: Install project dependencies
+        run: |
+          pip install -e .
+
+      # 6️⃣ 执行 shiv 打包
+      - name: Build pyagent.pyz with shiv
+        run: |
+          # 清理旧构建产物
+          rm -rf build/ dist/ *.egg-info pyagent.pyz
+          
+          # 执行打包，指定通用 python 解释器
+          shiv -c pyagent \
+               -o pyagent.pyz \
+               . \
+               --python "/usr/bin/env python3" \
+               --reproducible
+          
+          # 验证产物
+          ls -lh pyagent.pyz
+          file pyagent.pyz
+
+      # 7️⃣ 运行基本测试（可选，确保打包后可执行）
+      - name: Test pyz execution
+        run: |
+          # 强制解压并测试 --help（如果用了 click）
+          SHIV_FORCE_EXTRACT=1 python pyagent.pyz --help || true
+          
+          # 检查产物大小（应大于 1MB，否则可能打包失败）
+          SIZE=$(stat -c%s pyagent.pyz)
+          if [ $SIZE -lt 1000000 ]; then
+            echo "⚠️  Warning: pyz file seems too small ($SIZE bytes)"
+          fi
+
+      # 8️⃣ 上传构建产物
+      - name: Upload pyagent.pyz artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyagent-py38-${{ github.sha }}
+          path: pyagent.pyz
+          retention-days: 30
+          if-no-files-found: error
+
+      # 9️⃣ 上传构建日志（可选，便于调试）
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.sha }}
+          path: |
+            build/
+            dist/
+            *.egg-info/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # 🔁 可选：多版本构建矩阵（如果需要同时支持 3.8/3.11）
+  # build-matrix:
+  #   strategy:
+  #     matrix:
+  #       python-version: ['3.8', '3.11']
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #     - run: pip install shiv build
+  #     - run: shiv -c pyagent -o pyagent-py${{ matrix.python-version }}.pyz .
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: pyagent-py${{ matrix.python-version }}
+  #         path: pyagent-py${{ matrix.python-version }}.pyz
