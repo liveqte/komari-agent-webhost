@@ -17,7 +17,7 @@ on:
 permissions:
   contents: write  # 允许创建/更新 Release
   actions: read    # 允许读取工作流信息（可选）
-  
+
 # 防止并发构建冲突
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -95,23 +95,5 @@ jobs:
           files: pyagent.pyz
           tag_name: latest
           name: Latest Build
-          overwrite: true
+          overwrite_files: true  
           token: ${{ secrets.GITHUB_TOKEN }}
-
-  # 🔁 可选：多版本构建矩阵（如果需要同时支持 3.8/3.11）
-  # build-matrix:
-  #   strategy:
-  #     matrix:
-  #       python-version: ['3.8', '3.11']
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: ${{ matrix.python-version }}
-  #     - run: pip install shiv build
-  #     - run: shiv -c pyagent -o pyagent-py${{ matrix.python-version }}.pyz .
-  #     - uses: actions/upload-artifact@v4
-  #       with:
-  #         name: pyagent-py${{ matrix.python-version }}
-  #         path: pyagent-py${{ matrix.python-version }}.pyz
