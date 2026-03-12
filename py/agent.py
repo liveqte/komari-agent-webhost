@@ -1249,10 +1249,10 @@ def parse_args() -> Dict[str, Any]:
     i = 0
     while i < len(argv):
         arg = argv[i]
-        if arg == '--http-server' and i + 1 < len(argv):
+        if arg in ('--http-server', '-e') and i + 1 < len(argv):
             args['http_server'] = argv[i + 1]
             i += 1
-        elif arg == '--token' and i + 1 < len(argv):
+        elif arg in('--token','-t') and i + 1 < len(argv):
             args['token'] = argv[i + 1]
             i += 1
         elif arg == '--interval' and i + 1 < len(argv):
@@ -1312,8 +1312,8 @@ def _show_help():
     print("用法: python agent.py --token <token> [选项]")
     print()
     print("选项:")
-    print("  --http-server <url>        服务器地址 (也可通过 KOMARI_HTTP_SERVER 环境变量设置) (必须)")
-    print("  --token <token>            认证令牌 (也可通过 KOMARI_TOKEN 环境变量设置) (必须)")
+    print("  -e,--http-server <url>        服务器地址 (也可通过 KOMARI_HTTP_SERVER 环境变量设置) (必须)")
+    print("  -t,--token <token>            认证令牌 (也可通过 KOMARI_TOKEN 环境变量设置) (必须)")
     print("  --interval <sec>           实时数据上报间隔 (默认: 1.0秒，可通过 KOMARI_INTERVAL 环境变量设置)")
     print("  --log-level <level>        日志级别: 0=关闭Debug日志, 1=基本信息, 2=WebSocket传输，3=终端日志，4网络统计日志，5磁盘统计日志")
     print("  --disable-web-ssh          禁用远程控制功能 (远程执行和终端)")
