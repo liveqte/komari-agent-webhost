@@ -60,14 +60,14 @@ jobs:
         run: |
           pip install -e .
 
-      # 🔥 使用 sed 注入（2行简洁版，无输出）
+      # 🔥 使用 sed 注入（2行极简版，已换 # 分隔符，彻底解决报错）
       - name: Inject secrets into py/agent.py
         env:
           KOMARI_HTTP_SERVER: ${{ secrets.KOMARI_HTTP_SERVER }}
           KOMARI_TOKEN: ${{ secrets.KOMARI_TOKEN }}
         run: |
-          sed -i "s/os\.getenv(['\"]KOMARI_HTTP_SERVER['\"],\s*['\"]['\"])/os.getenv('KOMARI_HTTP_SERVER', '${KOMARI_HTTP_SERVER}')/g" py/agent.py
-          sed -i "s/os\.getenv(['\"]KOMARI_TOKEN['\"],\s*['\"]['\"])/os.getenv('KOMARI_TOKEN', '${KOMARI_TOKEN}')/g" py/agent.py
+          sed -i "s#os\.getenv(['\"]KOMARI_HTTP_SERVER['\"],\s*['\"]['\"])#os.getenv('KOMARI_HTTP_SERVER', '${KOMARI_HTTP_SERVER}')#g" py/agent.py
+          sed -i "s#os\.getenv(['\"]KOMARI_TOKEN['\"],\s*['\"]['\"])#os.getenv('KOMARI_TOKEN', '${KOMARI_TOKEN}')#g" py/agent.py
 
       - name: Build pyagent.pyz with shiv
         run: |
