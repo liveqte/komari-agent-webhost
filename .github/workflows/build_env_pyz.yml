@@ -1,5 +1,5 @@
 # .github/workflows/build_env_pyz.yml
-name: Build PyAgent
+name: Build PyAgent with env 
 
 on:
   push:
