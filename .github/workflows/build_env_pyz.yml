@@ -60,37 +60,14 @@ jobs:
         run: |
           pip install -e .
 
-      - name: Inject secrets into py/agent.py as defaults
+      # 🔥 使用 sed 注入（2行简洁版，无输出）
+      - name: Inject secrets into py/agent.py
         env:
           KOMARI_HTTP_SERVER: ${{ secrets.KOMARI_HTTP_SERVER }}
           KOMARI_TOKEN: ${{ secrets.KOMARI_TOKEN }}
         run: |
-          python -c '
-          import re
-          import os
-
-          with open("py/agent.py", "r", encoding="utf-8") as f:
-              content = f.read()
-
-          http_server = os.environ.get("KOMARI_HTTP_SERVER", "")
-          token = os.environ.get("KOMARI_TOKEN", "")
-
-          content = re.sub(
-              r"os\.getenv\([\'\"]KOMARI_HTTP_SERVER[\'\"],\s*[\'\"][\'\"]\)",
-              f"os.getenv(\"KOMARI_HTTP_SERVER\", {repr(http_server)})",
-              content,
-              flags=re.IGNORECASE
-          )
-          content = re.sub(
-              r"os\.getenv\([\'\"]KOMARI_TOKEN[\'\"],\s*[\'\"][\'\"]\)",
-              f"os.getenv(\"KOMARI_TOKEN\", {repr(token)})",
-              content,
-              flags=re.IGNORECASE
-          )
-
-          with open("py/agent.py", "w", encoding="utf-8") as f:
-              f.write(content)
-          '
+          sed -i "s/os\.getenv(['\"]KOMARI_HTTP_SERVER['\"],\s*['\"]['\"])/os.getenv('KOMARI_HTTP_SERVER', '${KOMARI_HTTP_SERVER}')/g" py/agent.py
+          sed -i "s/os\.getenv(['\"]KOMARI_TOKEN['\"],\s*['\"]['\"])/os.getenv('KOMARI_TOKEN', '${KOMARI_TOKEN}')/g" py/agent.py
 
       - name: Build pyagent.pyz with shiv
         run: |
