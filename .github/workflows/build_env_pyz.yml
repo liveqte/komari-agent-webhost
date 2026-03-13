@@ -11,6 +11,7 @@ on:
     paths:
       - 'py/agent.py'
       - 'setup.py'
+      - 'py/requirements.txt'
   pull_request:
     branches:
       - main
@@ -18,11 +19,12 @@ on:
     paths:
       - 'py/agent.py'
       - 'setup.py'
-  workflow_dispatch: 
+      - 'py/requirements.txt'
+  workflow_dispatch:
 
 permissions:
   contents: write
-  actions: read
+  actions: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -111,7 +113,6 @@ with open("py/agent.py", "w", encoding="utf-8") as f:
             echo "⚠️  Warning: pyz file seems too small ($SIZE bytes)"
           fi
 
-      # 🚀 上传 Artifact（保留最短时间：1 天）
       - name: Upload pyagent.pyz as artifact
         uses: actions/upload-artifact@v4
         with:
