@@ -66,31 +66,31 @@ jobs:
           KOMARI_TOKEN: ${{ secrets.KOMARI_TOKEN }}
         run: |
           python -c '
-import re
-import os
+          import re
+          import os
 
-with open("py/agent.py", "r", encoding="utf-8") as f:
-    content = f.read()
+          with open("py/agent.py", "r", encoding="utf-8") as f:
+              content = f.read()
 
-http_server = os.environ.get("KOMARI_HTTP_SERVER", "")
-token = os.environ.get("KOMARI_TOKEN", "")
+          http_server = os.environ.get("KOMARI_HTTP_SERVER", "")
+          token = os.environ.get("KOMARI_TOKEN", "")
 
-content = re.sub(
-    r"os\.getenv\([\'\"]KOMARI_HTTP_SERVER[\'\"],\s*[\'\"][\'\"]\)",
-    f"os.getenv(\"KOMARI_HTTP_SERVER\", {repr(http_server)})",
-    content,
-    flags=re.IGNORECASE
-)
-content = re.sub(
-    r"os\.getenv\([\'\"]KOMARI_TOKEN[\'\"],\s*[\'\"][\'\"]\)",
-    f"os.getenv(\"KOMARI_TOKEN\", {repr(token)})",
-    content,
-    flags=re.IGNORECASE
-)
+          content = re.sub(
+              r"os\.getenv\([\'\"]KOMARI_HTTP_SERVER[\'\"],\s*[\'\"][\'\"]\)",
+              f"os.getenv(\"KOMARI_HTTP_SERVER\", {repr(http_server)})",
+              content,
+              flags=re.IGNORECASE
+          )
+          content = re.sub(
+              r"os\.getenv\([\'\"]KOMARI_TOKEN[\'\"],\s*[\'\"][\'\"]\)",
+              f"os.getenv(\"KOMARI_TOKEN\", {repr(token)})",
+              content,
+              flags=re.IGNORECASE
+          )
 
-with open("py/agent.py", "w", encoding="utf-8") as f:
-    f.write(content)
-'
+          with open("py/agent.py", "w", encoding="utf-8") as f:
+              f.write(content)
+          '
 
       - name: Build pyagent.pyz with shiv
         run: |
