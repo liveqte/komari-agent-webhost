@@ -1,4 +1,4 @@
-# .github/workflows/build_pyz.yml
+# .github/workflows/build_env_pyz.yml
 name: Build PyAgent
 
 on:
@@ -21,10 +21,9 @@ on:
   workflow_dispatch: 
 
 permissions:
-  contents: write  # 允许创建/更新 Release
-  actions: read    # 允许读取工作流信息（可选）
+  contents: write
+  actions: read
 
-# 防止并发构建冲突
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -32,74 +31,91 @@ concurrency:
 jobs:
   build:
     name: Build pyagent.pyz (Python 3.8)
-    runs-on: ubuntu-22.04  # 使用较新 Ubuntu 确保 glibc 兼容性
+    runs-on: ubuntu-22.04
 
     steps:
-      # 1️⃣ 检出代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ 设置 Python 3.8 环境
       - name: Set up Python 3.8
         uses: actions/setup-python@v5
         with:
           python-version: '3.8'
-          cache: 'pip'  # 启用 pip 缓存加速
+          cache: 'pip'
 
-      # 3️⃣ 安装构建工具
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
           pip install shiv build setuptools wheel
 
-      # 4️⃣ 验证 Python 版本
       - name: Verify Python version
         run: |
           python --version
           which python
           pip --version
 
-      # 5️⃣ 安装项目依赖（确保 wheel 是 3.8 兼容的）
       - name: Install project dependencies
         run: |
           pip install -e .
 
-      # 6️⃣ 执行 shiv 打包
+      - name: Inject secrets into py/agent.py as defaults
+        env:
+          KOMARI_HTTP_SERVER: ${{ secrets.KOMARI_HTTP_SERVER }}
+          KOMARI_TOKEN: ${{ secrets.KOMARI_TOKEN }}
+        run: |
+          python -c '
+import re
+import os
+
+with open("py/agent.py", "r", encoding="utf-8") as f:
+    content = f.read()
+
+http_server = os.environ.get("KOMARI_HTTP_SERVER", "")
+token = os.environ.get("KOMARI_TOKEN", "")
+
+content = re.sub(
+    r"os\.getenv\([\'\"]KOMARI_HTTP_SERVER[\'\"],\s*[\'\"][\'\"]\)",
+    f"os.getenv(\"KOMARI_HTTP_SERVER\", {repr(http_server)})",
+    content,
+    flags=re.IGNORECASE
+)
+content = re.sub(
+    r"os\.getenv\([\'\"]KOMARI_TOKEN[\'\"],\s*[\'\"][\'\"]\)",
+    f"os.getenv(\"KOMARI_TOKEN\", {repr(token)})",
+    content,
+    flags=re.IGNORECASE
+)
+
+with open("py/agent.py", "w", encoding="utf-8") as f:
+    f.write(content)
+'
+
       - name: Build pyagent.pyz with shiv
         run: |
-          # 清理旧构建产物
           rm -rf build/ dist/ *.egg-info pyagent.pyz
           
-          # 执行打包，指定通用 python 解释器
           shiv -c pyagent \
                -o pyagent.pyz \
                . \
                --python "/usr/bin/env python3" \
                --reproducible
           
-          # 验证产物
           ls -lh pyagent.pyz
           file pyagent.pyz
 
-      # 7️⃣ 运行基本测试（可选，确保打包后可执行）
       - name: Test pyz execution
         run: |
-          # 强制解压并测试 --help（如果用了 click）
           SHIV_FORCE_EXTRACT=1 python pyagent.pyz --help || true
-          
-          # 检查产物大小（应大于 1MB，否则可能打包失败）
           SIZE=$(stat -c%s pyagent.pyz)
           if [ $SIZE -lt 1000000 ]; then
             echo "⚠️  Warning: pyz file seems too small ($SIZE bytes)"
           fi
 
-      # 8️⃣ 上传构建产物
-      - name: Release to GitHub
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+      # 🚀 上传 Artifact（保留最短时间：1 天）
+      - name: Upload pyagent.pyz as artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: pyagent.pyz
-          tag_name: latest
-          name: Latest Build
-          overwrite_files: true  
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: pyagent-pyz
+          path: pyagent.pyz
+          retention-days: 1
+          if-no-files-found: error
