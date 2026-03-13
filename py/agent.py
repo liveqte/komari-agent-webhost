@@ -1136,7 +1136,7 @@ class KomariMonitorClient:
         # 在推送前打印基础信息数据，按照指定格式
         Logger.info("基础信息上报数据:")
         Logger.info(json.dumps(basic_info, indent=2))
-        print(json.dumps(basic_info, indent=1))
+        Logger.info(json.dumps(basic_info, indent=1))
         Logger.debug(f"推送基础信息到: {url}", 1)
         
         try:
@@ -1324,7 +1324,7 @@ def _show_help():
 
 async def check_environment() -> bool:
     """检查运行环境"""
-    print("正在检查运行环境...")
+    Logger.info("正在检查运行环境...")
     
     errors = []
     warnings = []
@@ -1334,7 +1334,7 @@ async def check_environment() -> bool:
     if python_version < (3, 7):
         errors.append("需要 Python 3.7 或更高版本")
     else:
-        print(f"✅ Python 版本: {python_version.major}.{python_version.minor}.{python_version.micro}")
+        Logger.info(f"✅ Python 版本: {python_version.major}.{python_version.minor}.{python_version.micro}")
     
     # 检查必要模块
     required_modules = [
@@ -1346,7 +1346,7 @@ async def check_environment() -> bool:
     for module_name, package_name in required_modules:
         try:
             __import__(package_name)
-            print(f"✅ 模块 {module_name} 可用")
+            Logger.info(f"✅ 模块 {module_name} 可用")
         except ImportError:
             errors.append(f"缺少必要模块: {module_name}，请运行: pip install {package_name}")
     
@@ -1355,7 +1355,7 @@ async def check_environment() -> bool:
         required_commands = ['ping']
         for cmd in required_commands:
             if shutil.which(cmd) is not None:
-                print(f"✅ 系统命令 {cmd} 可用")
+                Logger.info(f"✅ 系统命令 {cmd} 可用")
             else:
                 warnings.append(f"缺少系统命令: {cmd}，部分功能可能受限")
 
@@ -1363,22 +1363,22 @@ async def check_environment() -> bool:
     if platform.system() != "Windows":
         try:
             import pty
-            print("✅ PTY 终端支持可用")
+            Logger.info("✅ PTY 终端支持可用")
         except ImportError:
             warnings.append("PTY 支持不可用，终端功能将受限")
     
     if warnings:
-        print("\n⚠️  警告:")
+        Logger.warning("\n⚠️  警告:")
         for warning in warnings:
-            print(f"   - {warning}")
+            Logger.warning(f"   - {warning}")
     
     if errors:
-        print("\n❌ 环境检查失败，发现以下问题:")
+        Logger.error("\n❌ 环境检查失败，发现以下问题:")
         for error in errors:
-            print(f"   - {error}")
+            Logger.error(f"   - {error}")
         return False
     
-    print("✅ 环境检查通过，所有依赖项均可用")
+    Logger.info("✅ 环境检查通过，所有依赖项均可用")
     return True
 
 async def main():
