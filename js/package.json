@@ -1,0 +1,28 @@
+{
+    "name": "komari-agent-node",
+    "version": "1.0.0",
+    "description": "Node.js implementation of Komari monitoring agent",
+    "main": "index.js",
+    "bin": {
+        "komari-agent": "./index.js"
+    },
+    "scripts": {
+        "start": "node index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "monitoring",
+        "agent",
+        "websocket",
+        "terminal"
+    ],
+    "author": "liming2038",
+    "license": "MIT",
+    "dependencies": {
+        "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
+        "ws": "^8.14.2"
+    },
+    "engines": {
+        "node": ">=14.0.0"
+    }
+}
